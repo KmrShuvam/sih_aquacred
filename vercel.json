@@ -7,10 +7,6 @@
     ],
     "routes": [
         {
-            "src": "/dashboard",
-            "dest": "/templates/dashboard.html"
-        },
-        {
             "src": "/(.*)",
             "dest": "app.py"
         }
