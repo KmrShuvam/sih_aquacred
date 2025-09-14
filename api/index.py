@@ -1,33 +1,60 @@
 import os
+import json
 from flask import Flask, request, jsonify, render_template
 from web3 import Web3
 from dotenv import load_dotenv
 from datetime import datetime
 
-# Load environment variables from a.env file
+# Load environment variables
 load_dotenv()
 
-app = Flask(__name__)
+# Configure Flask app with template folder for Vercel serverless environment
+# When running in api/, templates are at ../templates
+app = Flask(__name__, template_folder='../templates')
 
-# --- Blockchain Configuration ---
-# IMPORTANT: These are read from your Vercel Environment Variables
-INFURA_URL = os.getenv("INFURA_URL")
-WALLET_PRIVATE_KEY = os.getenv("WALLET_PRIVATE_KEY")
-CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
+def validate_env_vars():
+    """Validate that all required environment variables are present."""
+    required_vars = ['INFURA_URL', 'WALLET_PRIVATE_KEY', 'CONTRACT_ADDRESS', 'CONTRACT_ABI_JSON']
+    missing_vars = []
+    
+    for var in required_vars:
+        if not os.getenv(var):
+            missing_vars.append(var)
+    
+    if missing_vars:
+        raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
-# Connect to the Ethereum network
-w3 = Web3(Web3.HTTPProvider(INFURA_URL))
-account = w3.eth.account.from_key(WALLET_PRIVATE_KEY)
+def get_contract():
+    """Get a Web3 contract instance with proper configuration."""
+    validate_env_vars()
+    
+    # Get environment variables
+    INFURA_URL = os.getenv("INFURA_URL")
+    WALLET_PRIVATE_KEY = os.getenv("WALLET_PRIVATE_KEY")
+    CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
+    CONTRACT_ABI_JSON = os.getenv("CONTRACT_ABI_JSON")
+    
+    # Parse ABI from JSON
+    try:
+        CONTRACT_ABI = json.loads(CONTRACT_ABI_JSON)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid CONTRACT_ABI_JSON format: {e}")
+    
+    # Connect to Web3
+    w3 = Web3(Web3.HTTPProvider(INFURA_URL))
+    if not w3.is_connected():
+        raise ConnectionError("Failed to connect to Ethereum network")
+    
+    # Create account from private key
+    account = w3.eth.account.from_key(WALLET_PRIVATE_KEY)
+    
+    # Create contract instance with checksummed address
+    contract_address = Web3.to_checksum_address(CONTRACT_ADDRESS)
+    contract = w3.eth.contract(address=contract_address, abi=CONTRACT_ABI)
+    
+    return w3, account, contract
 
-# The ABI (Application Binary Interface) for your Solidity contract
-# This tells our Python code how to talk to the smart contract
-CONTRACT_ABI = ',"stateMutability":"view","type":"function"},{"inputs":,"name":"getProjectCount","outputs":,"stateMutability":"view","type":"function"},{"inputs":,"name":"projects","outputs":,"stateMutability":"view","type":"function"},{"inputs":,"name":"projectCounter","outputs":,"stateMutability":"view","type":"function"},{"inputs":,"name":"registerProject","outputs":,"stateMutability":"nonpayable","type":"function"}]'
-
-
-# Create a contract object
-contract = w3.eth.contract(address=CONTRACT_ADDRESS, abi=CONTRACT_ABI)
-
-# --- Flask Routes (The different pages of our website) ---
+# --- Flask Routes ---
 
 @app.route('/')
 def mobile_app():
@@ -39,25 +66,53 @@ def dashboard():
     """Serves the dashboard page."""
     return render_template('dashboard.html')
 
-# ####################################################################
-# THIS IS THE LINE THAT HAS BEEN FIXED
-# ####################################################################
+@app.route('/api/health')
+def health_check():
+    """Health check endpoint."""
+    try:
+        validate_env_vars()
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/submit_project', methods=['POST'])
 def submit_project():
     """Receives form data and writes it to the blockchain."""
     try:
+        # Validate environment variables
+        validate_env_vars()
+        
+        # Get Web3 and contract instances
+        w3, account, contract = get_contract()
+        
+        # Parse form data
         data = request.form
-        start_date_dt = datetime.strptime(data, '%Y-%m-%d')
+        required_fields = ['projectName', 'location', 'implementingBody', 'areaHectares', 'startDate', 'projectType']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"status": "error", "message": f"Missing required field: {field}"}), 400
+        
+        # Parse and validate data
+        project_name = data['projectName']
+        location = data['location']
+        implementing_body = data['implementingBody']
+        area_hectares = int(data['areaHectares'])
+        project_type = data['projectType']
+        
+        # Parse start date
+        start_date_str = data['startDate']
+        start_date_dt = datetime.strptime(start_date_str, '%Y-%m-%d')
         start_date_timestamp = int(start_date_dt.timestamp())
 
+        # Get nonce and build transaction
         nonce = w3.eth.get_transaction_count(account.address)
         tx = contract.functions.registerProject(
-            data['projectName'],
-            data['location'],
-            data,
-            int(data['areaHectares']),
+            project_name,
+            location,
+            implementing_body,
+            area_hectares,
             start_date_timestamp,
-            data
+            project_type
         ).build_transaction({
             'chainId': 11155111,  # Sepolia testnet chain ID
             'gas': 300000,
@@ -65,19 +120,25 @@ def submit_project():
             'nonce': nonce,
         })
 
-        signed_tx = w3.eth.account.sign_transaction(tx, private_key=WALLET_PRIVATE_KEY)
+        # Sign and send transaction
+        signed_tx = w3.eth.account.sign_transaction(tx, private_key=os.getenv("WALLET_PRIVATE_KEY"))
         tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
-        tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
-
+        
+        # Return immediately without waiting for receipt (for serverless timeout prevention)
         return jsonify({
             "status": "success",
-            "message": "Project registered successfully!",
             "transactionHash": tx_hash.hex()
         })
+        
+    except ValueError as e:
+        return jsonify({"status": "error", "message": f"Configuration error: {str(e)}"}), 500
+    except ConnectionError as e:
+        return jsonify({"status": "error", "message": f"Network error: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# This is a catch-all for Vercel to find the app
+# Vercel compatibility route
 @app.route('/index')
 def index():
+    """Vercel compatibility route."""
     return mobile_app()
