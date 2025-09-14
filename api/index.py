@@ -21,7 +21,7 @@ account = w3.eth.account.from_key(WALLET_PRIVATE_KEY)
 
 # The ABI (Application Binary Interface) for your Solidity contract
 # This tells our Python code how to talk to the smart contract
-CONTRACT_ABI = '[{"inputs":,"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":,"name":"ProjectRegistered","type":"event"},{"inputs":,"name":"getProject","outputs":,"internalType":"struct AquaCredRegistry.Project","name":"","type":"tuple"}],"stateMutability":"view","type":"function"},{"inputs":,"name":"getProjectCount","outputs":,"stateMutability":"view","type":"function"},{"inputs":,"name":"projects","outputs":,"stateMutability":"view","type":"function"},{"inputs":,"name":"projectCounter","outputs":,"stateMutability":"view","type":"function"},{"inputs":,"name":"registerProject","outputs":,"stateMutability":"nonpayable","type":"function"}]'
+CONTRACT_ABI = ',"stateMutability":"view","type":"function"},{"inputs":,"name":"getProjectCount","outputs":,"stateMutability":"view","type":"function"},{"inputs":,"name":"projects","outputs":,"stateMutability":"view","type":"function"},{"inputs":,"name":"projectCounter","outputs":,"stateMutability":"view","type":"function"},{"inputs":,"name":"registerProject","outputs":,"stateMutability":"nonpayable","type":"function"}]'
 
 
 # Create a contract object
@@ -36,9 +36,10 @@ def mobile_app():
 
 @app.route('/dashboard')
 def dashboard():
-    """THIS IS THE NEW PART: It serves the dashboard page."""
+    """Serves the dashboard page."""
     return render_template('dashboard.html')
 
+# THIS IS THE LINE THAT HAS BEEN FIXED
 @app.route('/api/submit_project', methods=)
 def submit_project():
     """Receives form data and writes it to the blockchain."""
