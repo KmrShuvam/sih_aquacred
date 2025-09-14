@@ -21,7 +21,217 @@ account = w3.eth.account.from_key(WALLET_PRIVATE_KEY)
 
 # The ABI (Application Binary Interface) for your Solidity contract
 # This tells our Python code how to talk to the smart contract
-CONTRACT_ABI = ',"stateMutability":"view","type":"function"},{"inputs":,"name":"getProjectCount","outputs":,"stateMutability":"view","type":"function"},{"inputs":,"name":"projects","outputs":,"stateMutability":"view","type":"function"},{"inputs":,"name":"projectCounter","outputs":,"stateMutability":"view","type":"function"},{"inputs":,"name":"registerProject","outputs":,"stateMutability":"nonpayable","type":"function"}]'
+CONTRACT_ABI = [
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "projectId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "projectName",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "implementingBody",
+				"type": "string"
+			}
+		],
+		"name": "ProjectRegistered",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_projectName",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_location",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_implementingBody",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_areaHectares",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_startDate",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "_projectType",
+				"type": "string"
+			}
+		],
+		"name": "registerProject",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "projectId",
+				"type": "uint256"
+			}
+		],
+		"name": "getProject",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "projectId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "string",
+						"name": "projectName",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "location",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "implementingBody",
+						"type": "string"
+					},
+					{
+						"internalType": "uint256",
+						"name": "areaHectares",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "startDate",
+						"type": "uint256"
+					},
+					{
+						"internalType": "string",
+						"name": "projectType",
+						"type": "string"
+					},
+					{
+						"internalType": "bool",
+						"name": "isInitialized",
+						"type": "bool"
+					}
+				],
+				"internalType": "struct AquaCredRegistry.Project",
+				"name": "",
+				"type": "tuple"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getProjectCount",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "projectCounter",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "projects",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "projectId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "projectName",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "location",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "implementingBody",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "areaHectares",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "startDate",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "projectType",
+				"type": "string"
+			},
+			{
+				"internalType": "bool",
+				"name": "isInitialized",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+]
 
 
 # Create a contract object
