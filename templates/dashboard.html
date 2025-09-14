@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaCred - Blue Carbon Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
+
+    <style>
+        /* Add your dashboard CSS here - this is a simplified version based on your screenshots */
+        body { font-family: 'Poppins', sans-serif; background-color: #f0f4f8; margin: 0; color: #1e293b; }
+       .header { background-color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }
+       .logo { font-size: 1.5em; font-weight: bold; color: #0a9396; }
+       .nav a { margin-left: 25px; text-decoration: none; color: #475569; font-weight: 500; }
+       .main-content { padding: 30px; }
+       .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
+       .kpi-card { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+       .kpi-card h3 { margin: 0; font-size: 1em; color: #64748b; }
+       .kpi-card.value { font-size: 2.5em; font-weight: bold; color: #0a9396; margin-top: 10px; }
+       .content-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 30px; }
+       .map-container,.registry-container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        #map { height: 500px; border-radius: 8px; }
+       .project-item { padding: 10px; border-bottom: 1px solid #e2e8f0; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <div class="logo">AquaCred</div>
+        <nav class="nav">
+            <a href="#">National Registry</a>
+            <a href="#">About the Project</a>
+            <a href="#">Methodology</a>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <h3>Total Projects Registered</h3>
+                <div class="value" id="total-projects">0</div>
+            </div>
+            <div class="kpi-card">
+                <h3>Total Hectares Under Restoration</h3>
+                <div class="value" id="total-hectares">0</div>
+            </div>
+            </div>
+
+        <div class="content-grid">
+            <div class="map-container">
+                <h3>Project Locations</h3>
+                <div id="map"></div>
+            </div>
+            <div class="registry-container">
+                <h3>Project Registry</h3>
+                <div id="project-list">
+                    </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- Blockchain Configuration (Frontend) ---
+        const INFURA_URL_FRONTEND = "YOUR_SEPOLIA_INFURA_URL"; // Use the same URL as backend
+        const CONTRACT_ADDRESS_FRONTEND = "0xe183333fC6332faa9C32F502542d5554Bcb2192E"; // Use the same address as backend
+
+        // ABI for the read-only functions we need on the dashboard
+        const CONTRACT_ABI_FRONTEND = [
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "projectId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "projectName",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "implementingBody",
+				"type": "string"
+			}
+		],
+		"name": "ProjectRegistered",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_projectName",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_location",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_implementingBody",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_areaHectares",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_startDate",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "_projectType",
+				"type": "string"
+			}
+		],
+		"name": "registerProject",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "projectId",
+				"type": "uint256"
+			}
+		],
+		"name": "getProject",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "projectId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "string",
+						"name": "projectName",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "location",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "implementingBody",
+						"type": "string"
+					},
+					{
+						"internalType": "uint256",
+						"name": "areaHectares",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "startDate",
+						"type": "uint256"
+					},
+					{
+						"internalType": "string",
+						"name": "projectType",
+						"type": "string"
+					},
+					{
+						"internalType": "bool",
+						"name": "isInitialized",
+						"type": "bool"
+					}
+				],
+				"internalType": "struct AquaCredRegistry.Project",
+				"name": "",
+				"type": "tuple"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getProjectCount",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "projectCounter",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "projects",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "projectId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "projectName",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "location",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "implementingBody",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "areaHectares",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "startDate",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "projectType",
+				"type": "string"
+			},
+			{
+				"internalType": "bool",
+				"name": "isInitialized",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+]
+
+        // --- Main Dashboard Logic ---
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Initialize the map
+            const map = L.map('map').setView([20.5937, 78.9629], 5); // Centered on India
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            // Function to fetch and display data from the blockchain
+            async function updateDashboard() {
+                try {
+                    // Connect to the blockchain
+                    const provider = new ethers.providers.JsonRpcProvider(INFURA_URL_FRONTEND);
+                    const contract = new ethers.Contract(CONTRACT_ADDRESS_FRONTEND, CONTRACT_ABI_FRONTEND, provider);
+
+                    // Fetch total number of projects
+                    const projectCount = await contract.getProjectCount();
+                    document.getElementById('total-projects').innerText = projectCount.toString();
+
+                    let totalHectares = 0;
+                    const projectListDiv = document.getElementById('project-list');
+                    projectListDiv.innerHTML = ''; // Clear previous list
+
+                    // Loop through each project and fetch its details
+                    for (let i = 1; i <= projectCount; i++) {
+                        const project = await contract.getProject(i);
+                        
+                        // project is an array: [id, name, location, body, hectares, date, type, initialized]
+                        const projectName = project[2];
+                        const projectLocation = project[3];
+                        const projectHectares = parseInt(project.[4]toString());
+
+                        totalHectares += projectHectares;
+
+                        // Add project to the registry list
+                        const projectItem = document.createElement('div');
+                        projectItem.className = 'project-item';
+                        projectItem.innerHTML = `<strong>${projectName}</strong><br><small>${projectLocation}</small>`;
+                        projectListDiv.appendChild(projectItem);
+                        
+                        // NOTE: For a real app, you'd get lat/lon. For this demo, we'll use placeholder coordinates.
+                        // Add a marker to the map (using placeholder coordinates for demo)
+                        const placeholderCoords = { "West Bengal": [22.5726, 88.3639], "Tamil Nadu": [11.1271, 78.6569], "Gujarat": [22.2587, 71.1924] };
+                        const coords = placeholderCoords[projectLocation] |
+
+| [20.5937, 78.9629];
+                        L.marker(coords).addTo(map)
+                           .bindPopup(`<b>${projectName}</b><br>${projectHectares} Hectares.`);
+                    }
+
+                    // Update total hectares KPI
+                    document.getElementById('total-hectares').innerText = totalHectares.toLocaleString();
+
+                } catch (error) {
+                    console.error("Could not fetch data from blockchain:", error);
+                    document.getElementById('project-list').innerText = "Error loading project data.";
+                }
+            }
+
+            // Initial load and then refresh every 30 seconds
+            updateDashboard();
+            setInterval(updateDashboard, 30000);
+        });
+    </script>
+</body>
+</html>
