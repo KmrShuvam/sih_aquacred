@@ -42,7 +42,7 @@ def dashboard():
 # ####################################################################
 # THIS IS THE LINE THAT HAS BEEN FIXED
 # ####################################################################
-@app.route('/api/submit_project', methods=['GET', 'POST'])
+@app.route('/api/submit_project', methods=['GET'])
 def submit_project():
     """Receives form data and writes it to the blockchain."""
     try:
